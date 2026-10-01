@@ -48,6 +48,11 @@ type Node struct {
 	Tags     []string `json:"tags,omitempty"`
 	// Subflow is a relative path to another flow Markdown file.
 	Subflow string `json:"subflow,omitempty"`
+	// SubflowJSON / SubflowName / SubflowNodes are filled by the compiler when
+	// a subflow reference resolves, so the canvas can drill into it.
+	SubflowJSON  string `json:"subflowJson,omitempty"`
+	SubflowName  string `json:"subflowName,omitempty"`
+	SubflowNodes int    `json:"subflowNodes,omitempty"`
 	// Sections holds long-form prose attributes keyed by lowercase label
 	// (logic, requirements, prerequisites, notes, inputs, outputs,
 	// failure modes, and any custom label).

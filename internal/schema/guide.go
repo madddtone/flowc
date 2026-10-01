@@ -78,7 +78,10 @@ Rules of thumb:
   goes under level-3 headings (` + "`### Logic`" + `, ` + "`### Requirements`" + `, ...).
 - ` + "`routes`" + ` is how you connect nodes. ` + "`to`" + ` must match another node id.
 - Use ` + "`type: decision`" + ` for branches (2+ routes, each with a ` + "`when:`" + `).
-- Use ` + "`type: subflow`" + ` with ` + "`flow: ./other.flow.md`" + ` to nest a flow.
+- Use ` + "`type: subflow`" + ` with ` + "`flow: ./other.flow.md`" + ` to nest a flow. flowc
+  compiles subflows recursively (to a JSON file beside each) and the canvas
+  drills into them: double-click the node, press Enter, or use the inspector
+  button; Backspace/Esc returns to the parent.
 - Cycles/retries are allowed; they are drawn routed around the graph.
 
 ## Node types

@@ -1,5 +1,6 @@
 // Package compile turns a flow Markdown file into the flow.json document
-// consumed by the canvas plugin.
+// consumed by the canvas plugin. Subflow references are compiled recursively
+// and annotated on their node so the canvas can drill in.
 package compile
 
 import (
@@ -48,10 +49,12 @@ type Output struct {
 	Meta    Meta          `json:"meta"`
 }
 
-// Result bundles the document with validation diagnostics.
+// Result bundles the document with validation diagnostics and every compiled
+// subflow (keyed by absolute json path).
 type Result struct {
-	Doc   *Output
-	Diags []validate.Diagnostic
+	Doc      *Output
+	Diags    []validate.Diagnostic
+	children map[string]*Output
 }
 
 // Forbidden reports whether validation found errors.
@@ -64,9 +67,19 @@ func (r *Result) Forbidden() bool {
 	return false
 }
 
-// Compile parses, validates, and lays out the flow at path.
+// Compile parses, validates, lays out, and recursively compiles subflows.
 func Compile(path string) (*Result, error) {
-	data, err := os.ReadFile(path)
+	return compileTree(path, map[string]bool{})
+}
+
+func compileTree(path string, seen map[string]bool) (*Result, error) {
+	abs := absPath(path)
+	if seen[abs] {
+		return nil, fmt.Errorf("subflow cycle: %s", abs)
+	}
+	seen[abs] = true
+
+	data, err := os.ReadFile(abs)
 	if err != nil {
 		return nil, err
 	}
@@ -75,11 +88,45 @@ func Compile(path string) (*Result, error) {
 		return nil, err
 	}
 	vr := validate.Validate(flow)
-	vr.Diagnostics = append(vr.Diagnostics, checkSubflows(flow, path)...)
 	if vr.Start != "" {
 		flow.Start = vr.Start
 	}
 	layout.Layout(flow, flow.Start)
+
+	children := map[string]*Output{}
+	var subDiags []validate.Diagnostic
+	for _, n := range flow.Nodes {
+		if n.Subflow == "" {
+			continue
+		}
+		ref := resolveRef(filepath.Dir(abs), n.Subflow)
+		if _, err := os.Stat(ref); err != nil {
+			subDiags = append(subDiags, validate.Diagnostic{
+				Severity: validate.Warning,
+				Node:     n.ID,
+				Message:  fmt.Sprintf("subflow file not found: %s", n.Subflow),
+			})
+			continue
+		}
+		child, err := compileTree(ref, seen)
+		if err != nil {
+			subDiags = append(subDiags, validate.Diagnostic{
+				Severity: validate.Warning,
+				Node:     n.ID,
+				Message:  fmt.Sprintf("subflow %s: %v", n.Subflow, err),
+			})
+			continue
+		}
+		childPath := jsonPathFor(ref)
+		children[childPath] = child.Doc
+		for k, v := range child.children {
+			children[k] = v
+		}
+		subDiags = append(subDiags, child.Diags...)
+		n.SubflowJSON = childPath
+		n.SubflowName = child.Doc.Flow
+		n.SubflowNodes = len(child.Doc.Nodes)
+	}
 
 	doc := &Output{
 		Version: Version,
@@ -90,19 +137,20 @@ func Compile(path string) (*Result, error) {
 		Edges:   flow.Edges,
 		Meta: Meta{
 			GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-			Source:      filepath.Base(path),
+			Source:      filepath.Base(abs),
 			SourceHash:  hash(data),
 			Layout:      "layered",
 			Stats:       stats(flow),
 		},
 	}
 	if doc.Flow == "" {
-		doc.Flow = filepath.Base(path)
+		doc.Flow = filepath.Base(abs)
 	}
-	return &Result{Doc: doc, Diags: vr.Diagnostics}, nil
+	return &Result{Doc: doc, Diags: append(vr.Diagnostics, subDiags...), children: children}, nil
 }
 
-// Write compiles path and writes the JSON document to outPath atomically.
+// Write compiles path and writes the JSON document (and every subflow JSON)
+// atomically.
 func Write(path, outPath string) (*Result, error) {
 	res, err := Compile(path)
 	if err != nil {
@@ -111,41 +159,48 @@ func Write(path, outPath string) (*Result, error) {
 	if res.Forbidden() {
 		return res, fmt.Errorf("validation failed")
 	}
-	data, err := json.MarshalIndent(res.Doc, "", "  ")
-	if err != nil {
-		return nil, err
+	// Subflows first, then the top-level document.
+	for childPath, doc := range res.children {
+		if err := writeJSON(childPath, doc); err != nil {
+			return res, err
+		}
 	}
-	data = append(data, '\n')
-	tmp := outPath + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return nil, err
-	}
-	if err := os.Rename(tmp, outPath); err != nil {
-		return nil, err
+	if err := writeJSON(outPath, res.Doc); err != nil {
+		return res, err
 	}
 	return res, nil
 }
 
-func checkSubflows(f *graph.Flow, path string) []validate.Diagnostic {
-	dir := filepath.Dir(path)
-	var diags []validate.Diagnostic
-	for _, n := range f.Nodes {
-		if n.Subflow == "" {
-			continue
-		}
-		ref := n.Subflow
-		if !filepath.IsAbs(ref) {
-			ref = filepath.Join(dir, ref)
-		}
-		if _, err := os.Stat(ref); err != nil {
-			diags = append(diags, validate.Diagnostic{
-				Severity: validate.Warning,
-				Node:     n.ID,
-				Message:  fmt.Sprintf("subflow file not found: %s", n.Subflow),
-			})
-		}
+func writeJSON(outPath string, doc *Output) error {
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
 	}
-	return diags
+	data = append(data, '\n')
+	tmp := outPath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, outPath)
+}
+
+func resolveRef(dir, ref string) string {
+	if !filepath.IsAbs(ref) {
+		ref = filepath.Join(dir, ref)
+	}
+	return absPath(ref)
+}
+
+func jsonPathFor(md string) string {
+	base := md[:len(md)-len(filepath.Ext(md))]
+	return base + ".json"
+}
+
+func absPath(p string) string {
+	if a, err := filepath.Abs(p); err == nil {
+		return filepath.Clean(a)
+	}
+	return filepath.Clean(p)
 }
 
 func stats(f *graph.Flow) Stats {
