@@ -21,14 +21,14 @@ const (
 )
 
 var typeHeight = map[string]float64{
-	graph.TypeStart:    54,
-	graph.TypeEnd:      54,
-	graph.TypeStep:     66,
-	graph.TypeDecision: 88,
-	graph.TypeSubflow:  76,
-	graph.TypeExternal: 66,
-	graph.TypeParallel: 52,
-	graph.TypeJoin:     52,
+	graph.TypeStart:    64,
+	graph.TypeEnd:      64,
+	graph.TypeStep:     80,
+	graph.TypeDecision: 100,
+	graph.TypeSubflow:  98,
+	graph.TypeExternal: 78,
+	graph.TypeParallel: 56,
+	graph.TypeJoin:     56,
 }
 
 // Layout computes positions for every node and marks back-edges on f.
