@@ -18,7 +18,7 @@ import (
 	"github.com/madddtone/flowc/internal/validate"
 )
 
-const version = "0.2.0"
+const version = "0.4.0"
 
 const pluginID = "io.github.madddtone.flow-tracker"
 

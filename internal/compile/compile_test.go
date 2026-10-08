@@ -98,6 +98,69 @@ func TestCompile(t *testing.T) {
 	}
 }
 
+func TestTableNode(t *testing.T) {
+	body := `---
+flow: Data
+start: orders
+---
+## orders
+` + "```yaml" + `
+type: table
+title: orders
+schema: public
+columns:
+  - name: id
+    type: bigint
+    pk: true
+  - "user_id bigint FK users.id"
+  - name: total
+    type: numeric
+    nullable: false
+  - name: a
+  - name: b
+  - name: c
+  - name: d
+routes:
+  - to: done
+    data: order total
+` + "```" + `
+## done
+` + "```yaml" + `
+type: end
+` + "```" + `
+`
+	res, err := Compile(writeTemp(t, body))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	n := res.Doc.Nodes[0]
+	if n.Type != graph.TypeTable {
+		t.Fatalf("expected table, got %q", n.Type)
+	}
+	if len(n.Columns) != 7 {
+		t.Fatalf("expected 7 columns, got %d", len(n.Columns))
+	}
+	if !n.Columns[0].PK {
+		t.Fatalf("expected first column PK")
+	}
+	if n.Columns[1].FK != "users.id" {
+		t.Fatalf("compact FK not parsed: %+v", n.Columns[1])
+	}
+	if n.Schema != "public" {
+		t.Fatalf("schema not parsed: %q", n.Schema)
+	}
+	// Height should reflect only the first 5 shown columns + a "+N more" row.
+	shown := 5
+	wantH := 24.0 + float64(shown)*18.0 + 6.0 + 16.0
+	if n.Rect.H != wantH {
+		t.Fatalf("table height = %v, want %v", n.Rect.H, wantH)
+	}
+	// data: alias becomes the edge label.
+	if res.Doc.Edges[0].Label != "order total" {
+		t.Fatalf("data alias not applied: %q", res.Doc.Edges[0].Label)
+	}
+}
+
 func TestValidateDanglingRoute(t *testing.T) {
 	body := `---
 flow: Bad

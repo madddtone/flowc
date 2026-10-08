@@ -96,6 +96,33 @@ Rules of thumb:
 | external   | a system/service outside your control               |
 | parallel   | fan-out to parallel work                            |
 | join       | where parallel branches merge                       |
+| table      | a data store (DB table / dataset) for data-flow     |
+
+## Tables (data-flow diagrams)
+
+A ` + "`type: table`" + ` node draws a header plus its columns. The canvas shows the
+first **5** columns (primary/foreign keys first); every column is listed in the
+inspector. Columns are authored as mappings or as compact strings:
+
+` + "```yaml" + `
+type: table
+title: orders
+schema: public
+columns:
+  - name: id                 # structured
+    type: bigint
+    pk: true
+  - "user_id bigint FK users.id"   # compact: name [type] [PK] [FK ref] [NOT NULL]
+  - name: total
+    type: numeric
+routes:
+  - to: charge
+    data: order total        # data-flow alias for ` + "`label`" + `
+` + "```" + `
+
+Use edges to show what data moves between tables and processing steps
+(` + "`data:`" + ` or ` + "`label:`" + ` on the route). Mark ` + "`pk`" + ` and ` + "`fk`" + ` so the key
+fields are the ones shown on the node.
 
 ## Prose sections (any label is kept)
 
@@ -149,17 +176,29 @@ WORKFLOW
 FORMAT (summary — run ` + "`flowc guide`" + ` for the authoritative spec)
 - Optional YAML front matter: flow, start, actors.
 - One node per level-2 heading: ` + "`## <id>`" + `, with ONE ` + "```yaml" + ` block:
-    type: start|end|step|decision|subflow|external|parallel|join
+    type: start|end|step|decision|subflow|external|parallel|join|table
     title, actor, owner, status, priority, code (file:line), tags
     routes:            # outgoing edges
       - to: <other-id>
         when: <guard>  # for decisions
+        data: <payload> # optional, for data-flow edges
 - Long-form text under level-3 headings: ### Logic, ### Requirements,
   ### Prerequisites, ### Inputs, ### Outputs, ### Failure Modes, ### Notes.
+- DATA-FLOW / DATABASES: use ` + "`type: table`" + ` for a data store and list its
+  columns (` + "`columns:`" + `). Mark ` + "`pk: true`" + ` and ` + "`fk: <table.column>`" + ` so the key
+  fields are shown; the canvas shows the first 5 columns (keys first) and the
+  inspector shows all of them. Compact form is allowed:
+  ` + "`- \"user_id bigint FK users.id NOT NULL\"`" + `.
+    type: table
+    title: orders
+    schema: public
+    columns: [ "id bigint PK", "user_id bigint FK users.id", "total numeric" ]
 
 QUALITY BAR
 - Every routes[].to must exactly match another node id.
 - Use type: decision for branches, each with a when: guard.
+- For databases/data flows, use ` + "`type: table`" + ` with a ` + "`columns:`" + ` list; mark
+  ` + "`pk`" + `/` + "`fk`" + `, and label data movement with ` + "`data:`" + ` on the route.
 - Prefer short, stable ids; keep the flow faithful to the actual code/system.
 - Cite code with code: path/to/file.ext:LINE; fill Logic/Requirements/
   Prerequisites/Notes where you have evidence — do not invent details.

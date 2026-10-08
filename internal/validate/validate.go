@@ -148,6 +148,9 @@ func Validate(f *graph.Flow) Result {
 		if n.Type == graph.TypeDecision && len(out) < 2 {
 			diags = append(diags, Diagnostic{Severity: Warning, Node: n.ID, Message: "decision node has fewer than two routes"})
 		}
+		if n.Type == graph.TypeTable && len(n.Columns) == 0 {
+			diags = append(diags, Diagnostic{Severity: Info, Node: n.ID, Message: "table node has no columns"})
+		}
 	}
 
 	return Result{Diagnostics: diags, Start: start}

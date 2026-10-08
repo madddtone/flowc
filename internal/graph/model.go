@@ -12,6 +12,7 @@ const (
 	TypeExternal = "external"
 	TypeParallel = "parallel"
 	TypeJoin     = "join"
+	TypeTable    = "table"
 )
 
 // KnownTypes is the set of node types accepted by the parser. Unknown types
@@ -25,6 +26,7 @@ var KnownTypes = map[string]bool{
 	TypeExternal: true,
 	TypeParallel: true,
 	TypeJoin:     true,
+	TypeTable:    true,
 }
 
 // Rect is an axis-aligned rectangle with the origin at its top-left corner.
@@ -59,6 +61,10 @@ type Node struct {
 	Sections map[string]string `json:"sections,omitempty"`
 	// SectionOrder preserves author ordering for the inspector.
 	SectionOrder []string `json:"sectionOrder,omitempty"`
+	// Table fields (type: table) — for data-flow diagrams.
+	Columns []Column `json:"columns,omitempty"`
+	Schema  string   `json:"schema,omitempty"`
+	Store   string   `json:"store,omitempty"`
 	// Routes are the outgoing edges declared on this node.
 	Routes []Route `json:"-"`
 
@@ -68,11 +74,23 @@ type Node struct {
 	Rect Rect `json:"rect"`
 }
 
+// Column is one field of a table node.
+type Column struct {
+	Name     string `yaml:"name" json:"name"`
+	Type     string `yaml:"type,omitempty" json:"type,omitempty"`
+	PK       bool   `yaml:"pk,omitempty" json:"pk,omitempty"`
+	FK       string `yaml:"fk,omitempty" json:"fk,omitempty"`
+	Nullable *bool  `yaml:"nullable,omitempty" json:"nullable,omitempty"`
+	Note     string `yaml:"note,omitempty" json:"note,omitempty"`
+}
+
 // Route is an outgoing edge as authored on a node.
 type Route struct {
 	To    string `yaml:"to" json:"to"`
 	When  string `yaml:"when" json:"when,omitempty"`
 	Label string `yaml:"label" json:"label,omitempty"`
+	// Data is an alias for Label used in data-flow diagrams.
+	Data string `yaml:"data" json:"data,omitempty"`
 }
 
 // Edge is a resolved, emitted connection between two nodes.

@@ -31,6 +31,16 @@ var typeHeight = map[string]float64{
 	graph.TypeJoin:     56,
 }
 
+// Table sizing. The canvas shows at most tableMaxShown columns (keys first);
+// the rest live in the inspector.
+const (
+	tableMaxShown = 5
+	tableHeader   = 24.0
+	tableRow      = 18.0
+	tableMoreRow  = 16.0
+	tableVPad     = 6.0
+)
+
 // Layout computes positions for every node and marks back-edges on f.
 func Layout(f *graph.Flow, start string) {
 	if len(f.Nodes) == 0 {
@@ -148,6 +158,27 @@ func nodeWidth(n *graph.Node) float64 {
 	if label == "" {
 		label = n.ID
 	}
+	if n.Type == graph.TypeTable {
+		max := 0
+		for _, c := range n.Columns {
+			col := utf8.RuneCountInString(c.Name) + utf8.RuneCountInString(c.Type) + 4
+			if col > max {
+				max = col
+			}
+		}
+		head := utf8.RuneCountInString(label) + utf8.RuneCountInString(n.Schema) + 4
+		if head > max {
+			max = head
+		}
+		w := 90 + float64(max)*7
+		if w < 210 {
+			w = 210
+		}
+		if w > 360 {
+			w = 360
+		}
+		return w
+	}
 	w := 40 + float64(utf8.RuneCountInString(label))*7.5
 	if w < 150 {
 		w = 150
@@ -159,6 +190,20 @@ func nodeWidth(n *graph.Node) float64 {
 }
 
 func nodeHeight(n *graph.Node) float64 {
+	if n.Type == graph.TypeTable {
+		shown := len(n.Columns)
+		if shown > tableMaxShown {
+			shown = tableMaxShown
+		}
+		h := tableHeader + float64(shown)*tableRow + tableVPad
+		if len(n.Columns) > tableMaxShown {
+			h += tableMoreRow
+		}
+		if h < 64 {
+			h = 64
+		}
+		return h
+	}
 	if h, ok := typeHeight[n.Type]; ok {
 		return h
 	}

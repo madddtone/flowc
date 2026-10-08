@@ -37,7 +37,7 @@ Each node is a level-2 heading whose text is the node id:
 
 ## cart
 ` + "```yaml" + `
-type: step                 # start|end|step|decision|subflow|external|parallel|join
+type: step                 # start|end|step|decision|subflow|external|parallel|join|table
 title: Cart Review         # display label (defaults to id)
 actor: customer            # optional; groups into a swimlane
 owner: team-checkout       # optional
@@ -49,9 +49,32 @@ flow: ./auth.flow.md       # required for type: subflow
 routes:                    # outgoing edges (this is what branches)
   - to: payment
     when: cart valid       # optional guard/condition
-    label: happy path      # optional edge label
+    label: happy path      # optional edge label (alias: data)
   - to: cart-error
     when: cart invalid
+` + "```" + `
+
+## Tables (type: table)
+For data-flow diagrams. A table node draws a header and its columns; the canvas
+shows the first 5 (primary/foreign keys first) and the inspector shows them all.
+Columns are written as mappings, or as a compact string:
+
+## orders
+` + "```yaml" + `
+type: table
+title: orders
+schema: public             # optional
+columns:
+  - name: id               # structured form
+    type: bigint
+    pk: true
+  - "user_id bigint FK users.id"   # compact: name [type] [PK] [FK ref] [NOT NULL]
+  - name: total
+    type: numeric
+    nullable: false
+routes:
+  - to: charge
+    data: order total      # data-flow alias for label
 ` + "```" + `
 
 ## Prose sections (optional, any label)
@@ -75,6 +98,8 @@ Lists are lines beginning with "- ". Everything else is plain text/Markdown.
 - A node with no routes is a dead end (use type: end to silence the warning).
 - Cycles are allowed; back-edges are drawn routed around the graph.
 - Referenced subflow files are relative to the current flow.md.
+- Use ` + "`type: table`" + ` for data stores in data-flow diagrams; mark ` + "`pk`" + `/` + "`fk`" + `.
+  The canvas shows up to 5 key columns; the inspector shows every column.
 `
 
 // Sample is written by `flowc init` when no flow.md exists.

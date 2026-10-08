@@ -88,6 +88,33 @@ Rules of thumb:
 | external   | a system/service outside your control               |
 | parallel   | fan-out to parallel work                            |
 | join       | where parallel branches merge                       |
+| table      | a data store (DB table / dataset) for data-flow     |
+
+## Tables (data-flow diagrams)
+
+A `type: table` node draws a header plus its columns. The canvas shows the
+first **5** columns (primary/foreign keys first); every column is listed in the
+inspector. Columns are authored as mappings or as compact strings:
+
+```yaml
+type: table
+title: orders
+schema: public
+columns:
+  - name: id                 # structured
+    type: bigint
+    pk: true
+  - "user_id bigint FK users.id"   # compact: name [type] [PK] [FK ref] [NOT NULL]
+  - name: total
+    type: numeric
+routes:
+  - to: charge
+    data: order total        # data-flow alias for `label`
+```
+
+Use edges to show what data moves between tables and processing steps
+(`data:` or `label:` on the route). Mark `pk` and `fk` so the key
+fields are the ones shown on the node.
 
 ## Prose sections (any label is kept)
 

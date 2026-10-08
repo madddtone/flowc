@@ -57,6 +57,33 @@ func Marshal(f *graph.Flow) string {
 		if n.Subflow != "" {
 			fmt.Fprintf(&b, "flow: %s\n", yamlScalar(n.Subflow))
 		}
+		if n.Schema != "" {
+			fmt.Fprintf(&b, "schema: %s\n", yamlScalar(n.Schema))
+		}
+		if n.Store != "" {
+			fmt.Fprintf(&b, "store: %s\n", yamlScalar(n.Store))
+		}
+		if len(n.Columns) > 0 {
+			b.WriteString("columns:\n")
+			for _, c := range n.Columns {
+				fmt.Fprintf(&b, "  - name: %s\n", yamlScalar(c.Name))
+				if c.Type != "" {
+					fmt.Fprintf(&b, "    type: %s\n", yamlScalar(c.Type))
+				}
+				if c.PK {
+					b.WriteString("    pk: true\n")
+				}
+				if c.FK != "" {
+					fmt.Fprintf(&b, "    fk: %s\n", yamlScalar(c.FK))
+				}
+				if c.Nullable != nil {
+					fmt.Fprintf(&b, "    nullable: %t\n", *c.Nullable)
+				}
+				if c.Note != "" {
+					fmt.Fprintf(&b, "    note: %s\n", yamlScalar(c.Note))
+				}
+			}
+		}
 		if len(n.Routes) > 0 {
 			b.WriteString("routes:\n")
 			for _, r := range n.Routes {

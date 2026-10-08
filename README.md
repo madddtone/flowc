@@ -88,6 +88,11 @@ YAML front matter for flow metadata, then one `## id` section per node with a
 `Outputs`, `Failure Modes`, `Notes`, ...). Full details: `flowc guide` or
 [docs/flow-format.md](docs/flow-format.md).
 
+For data-flow diagrams, `type: table` draws a data store with its columns
+(structured mappings or the compact `"user_id bigint FK users.id"` form). The
+canvas shows the first 5 columns (primary/foreign keys first); the inspector
+shows them all. Route `data:` labels the payload that flows along an edge.
+
 ## Layout
 
 Positions are computed at compile time by a deterministic layered layout

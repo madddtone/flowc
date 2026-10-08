@@ -51,7 +51,85 @@ type nodeMeta struct {
 	Code     string        `yaml:"code"`
 	Tags     []string      `yaml:"tags"`
 	Flow     string        `yaml:"flow"`
+	Schema   string        `yaml:"schema"`
+	Store    string        `yaml:"store"`
+	Columns  []columnYAML  `yaml:"columns"`
 	Routes   []graph.Route `yaml:"routes"`
+}
+
+// columnYAML accepts either a structured mapping
+//
+//	{ name: id, type: bigint, pk: true }
+//
+// or a compact scalar:
+//
+//	"user_id bigint FK users.id NOT NULL"
+type columnYAML struct {
+	Name     string `yaml:"name"`
+	Type     string `yaml:"type"`
+	PK       bool   `yaml:"pk"`
+	FK       string `yaml:"fk"`
+	Nullable *bool  `yaml:"nullable"`
+	Note     string `yaml:"note"`
+}
+
+func (c *columnYAML) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		return parseCompactColumn(value.Value, c)
+	}
+	type raw columnYAML
+	var r raw
+	if err := value.Decode(&r); err != nil {
+		return err
+	}
+	*c = columnYAML(r)
+	return nil
+}
+
+func parseCompactColumn(s string, c *columnYAML) error {
+	fields := strings.Fields(s)
+	if len(fields) == 0 {
+		return fmt.Errorf("empty column")
+	}
+	c.Name = fields[0]
+	rest := fields[1:]
+	if len(rest) > 0 && !isColumnKeyword(rest[0]) {
+		c.Type = rest[0]
+		rest = rest[1:]
+	}
+	var note []string
+	for i := 0; i < len(rest); i++ {
+		switch strings.ToUpper(rest[i]) {
+		case "PK", "PRIMARY", "PRIMARY_KEY":
+			c.PK = true
+		case "FK", "REFERENCES":
+			if i+1 < len(rest) {
+				c.FK = rest[i+1]
+				i++
+			}
+		case "NULL":
+			t := true
+			c.Nullable = &t
+		case "NOT":
+			if i+1 < len(rest) && strings.ToUpper(rest[i+1]) == "NULL" {
+				f := false
+				c.Nullable = &f
+				i++
+			}
+		default:
+			note = append(note, rest[i])
+		}
+	}
+	c.Note = strings.Join(note, " ")
+	return nil
+}
+
+func isColumnKeyword(s string) bool {
+	switch strings.ToUpper(s) {
+	case "PK", "PRIMARY", "PRIMARY_KEY", "FK", "REFERENCES", "NULL", "NOT":
+		return true
+	}
+	return false
 }
 
 // ParseFile reads and parses a flow Markdown file.
@@ -205,6 +283,14 @@ func applyMeta(n *graph.Node, m nodeMeta) {
 	n.Code = m.Code
 	n.Tags = m.Tags
 	n.Subflow = m.Flow
+	n.Schema = m.Schema
+	n.Store = m.Store
+	n.Columns = make([]graph.Column, 0, len(m.Columns))
+	for _, c := range m.Columns {
+		n.Columns = append(n.Columns, graph.Column{
+			Name: c.Name, Type: c.Type, PK: c.PK, FK: c.FK, Nullable: c.Nullable, Note: c.Note,
+		})
+	}
 	n.Routes = m.Routes
 }
 
@@ -222,12 +308,16 @@ func buildEdges(nodes []*graph.Node) []graph.Edge {
 			if seen[key] > 1 {
 				id = fmt.Sprintf("%s#%d", key, seen[key])
 			}
+			label := r.Label
+			if label == "" {
+				label = r.Data
+			}
 			edges = append(edges, graph.Edge{
 				ID:    id,
 				From:  n.ID,
 				To:    r.To,
 				When:  r.When,
-				Label: r.Label,
+				Label: label,
 			})
 		}
 	}
